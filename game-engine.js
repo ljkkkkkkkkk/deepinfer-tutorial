@@ -71,6 +71,53 @@
         { id: "B", title: "缓存较长的回答", prompt: 7, generated: 1, ready: true, goal: 4, priority: 2, arrival: 0 },
         { id: "C", title: "缓存较短的回答", prompt: 4, generated: 1, ready: true, goal: 4, priority: 2, arrival: 0 }
       ]
+    },
+    challenge5: {
+      name: "进阶5 · 急单插队", challenge: true, dynamic: true,
+      description: "5块GPU缓存、每轮4 Token。C在第2片、D在第5片到达；给急单留空间也要照顾旧请求。", target: 35,
+      config: { tokens: 4, blocks: 5, blockSize: 4, cpu: 2, ssd: 0, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "持续生成的旧回答", prompt: 8, generated: 1, ready: true, goal: 6, priority: 1, arrival: 0 },
+        { id: "B", title: "读到一半的长问题", prompt: 12, cached: 4, goal: 3, priority: 2, arrival: 0 },
+        { id: "C", title: "新到达的高优急单", prompt: 4, goal: 2, priority: 3, arrival: 2 },
+        { id: "D", title: "第二波新请求", prompt: 6, goal: 3, priority: 2, arrival: 5 }
+      ]
+    },
+    challenge6: {
+      name: "进阶6 · 搬运时的突发流量", challenge: true, dynamic: true,
+      description: "GPU开局满载。两条急单会在搬运期间到达，比较快速释放1块和慢速释放2块的接入代价。", target: 40,
+      config: { tokens: 4, blocks: 5, blockSize: 4, cpu: 2, cpuReserved: 1, ssd: 6, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "正在回答的中优请求", prompt: 6, generated: 2, ready: true, goal: 5, priority: 2, arrival: 0 },
+        { id: "B", title: "占两块的低优回答", prompt: 4, generated: 4, ready: true, goal: 7, priority: 1, arrival: 0 },
+        { id: "C", title: "已经缓存一块的读题请求", prompt: 8, cached: 4, goal: 3, priority: 2, arrival: 0 },
+        { id: "D", title: "第一条突发急单", prompt: 4, goal: 2, priority: 3, arrival: 1 },
+        { id: "E", title: "第二条突发急单", prompt: 6, goal: 3, priority: 3, arrival: 2 }
+      ]
+    },
+    challenge7: {
+      name: "进阶7 · 不能全接的双波请求", challenge: true, dynamic: true,
+      description: "6块GPU缓存，无CPU/SSD。新请求接连到达，每次抢占都要算清重建成本与公平性。", target: 40,
+      config: { tokens: 6, blocks: 6, blockSize: 4, cpu: 0, ssd: 0, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "占三块的低优回答", prompt: 8, generated: 4, ready: true, goal: 9, priority: 1, arrival: 0 },
+        { id: "B", title: "仍有块内空位的回答", prompt: 4, generated: 1, ready: true, goal: 4, priority: 2, arrival: 0 },
+        { id: "C", title: "第一波高优长输入", prompt: 8, goal: 3, priority: 3, arrival: 1 },
+        { id: "D", title: "紧接着到达的高优请求", prompt: 4, goal: 2, priority: 3, arrival: 2 },
+        { id: "E", title: "后来到达的普通请求", prompt: 6, goal: 3, priority: 2, arrival: 4 }
+      ]
+    },
+    challenge8: {
+      name: "进阶8 · 长读题夹着短急单", challenge: true, dynamic: true,
+      description: "每轮4 Token、GPU仅5块。连续推进长Prefill会用完空间，而短急单在第1、3、5片到达。", target: 40,
+      config: { tokens: 4, blocks: 5, blockSize: 4, cpu: 2, ssd: 4, cpuRate: 1, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "接近块边界的旧回答", prompt: 6, generated: 1, ready: true, goal: 5, priority: 2, arrival: 0 },
+        { id: "B", title: "长输入的分块Prefill", prompt: 12, cached: 4, goal: 3, priority: 1, arrival: 0 },
+        { id: "C", title: "第一条短急单", prompt: 4, goal: 2, priority: 3, arrival: 1 },
+        { id: "D", title: "第三片到达的文档请求", prompt: 8, goal: 3, priority: 3, arrival: 3 },
+        { id: "E", title: "第五片到达的短请求", prompt: 4, goal: 3, priority: 2, arrival: 5 }
+      ]
     }
   };
 
@@ -85,6 +132,12 @@
       .reduce((total, r) => total + blocksFor(r.cached, state), location === "cpu" ? state.config.cpuReserved || 0 : 0);
   }
   function visible(state) { return state.requests.filter(r => r.arrival <= state.time); }
+  function forecast(state) {
+    return state.requests.filter(r=>r.arrival>0).sort((a,b)=>a.arrival-b.arrival).map(r=>({
+      id:r.id, title:r.title, arrival:r.arrival, prompt:r.prompt, priority:r.priority,
+      status:r.arrival>state.time ? "future" : status(r)
+    }));
+  }
   function finished(state) { return state.requests.every(r => r.done); }
   function create(levelId = "start", overrides = {}) {
     const level = LEVELS[levelId] || LEVELS.start;
@@ -264,7 +317,7 @@
       utilization: state.capacity ? state.work / state.capacity : 0, score,
       longestWait: Math.max(0, ...visible(state).filter(r=>!r.done).map(r=>state.time - Math.max(r.arrival,r.lastService))) };
   }
-  const api = { LEVELS, create, clone, blocksFor, status, usage, visible, finished, plan, execute, reclaim, idle, hint, stats };
+  const api = { LEVELS, create, clone, blocksFor, status, usage, visible, forecast, finished, plan, execute, reclaim, idle, hint, stats };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.SchedulerGame = api;
 })(typeof globalThis === "object" ? globalThis : this);

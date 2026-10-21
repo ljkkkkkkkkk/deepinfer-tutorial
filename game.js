@@ -4,7 +4,7 @@
   const C = SchedulerChallenges;
   const $ = id => document.getElementById(id);
   const key = "deepinfer-scheduler-game-v1";
-  const colors = { A: "#2456d8", B: "#c45c45", C: "#36835a", D: "#8c58ac" };
+  const colors = { A: "#2456d8", B: "#c45c45", C: "#36835a", D: "#8c58ac", E: "#946510" };
   let state;
   let history = [];
   let phase = "prefill";
@@ -25,7 +25,7 @@
   function configDescription(id) {
     const level=G.LEVELS[id];
     const config=id===state.levelId ? state.config : level.config;
-    return `${level.description} ${level.challenge ? "题目预算固定；先核算与排两轮，不必全部完成才提交判断。" : `CPU速度：${config.cpuRate}块/片；SSD：${config.ssdRate}块/片。参考目标：${level.target}片内完成。`}`;
+    return `${level.description} ${level.dynamic ? "题目预算固定；按到达事件逐轮调整，不必全部完成才提交判断。" : level.challenge ? "题目预算固定；先核算与排两轮，不必全部完成才提交判断。" : `CPU速度：${config.cpuRate}块/片；SSD：${config.ssdRate}块/片。参考目标：${level.target}片内完成。`}`;
   }
   function lockConfig(id) {
     for (const name of ["tokenConfig","blockConfig","cpuConfig"]) $(name).disabled=!!G.LEVELS[id].challenge;
@@ -45,6 +45,10 @@
     const n=notes();
     const results=C.check(state.levelId,n.answers);
     $("judgmentResult").innerHTML=n.checked ? `<p><strong>初始题面核算：${results.filter(r=>r.correct).length} / ${results.length}项正确。</strong> 核算与策略分开评价。</p><ul>${results.map(r=>`<li class="${r.correct ? "check-correct" : "check-wrong"}"><b>${r.correct ? "正确" : r.answered ? "需调整" : "未填写"} · ${r.label}</b><span>${r.explanation}</span></li>`).join("")}</ul><p>${n.goal ? `你的目标：${escape(n.goal)}。` : "你还没有选择策略目标。"} ${n.reflection.trim() ? "策略笔记已保存；这是开放题，程序不自动判定文字推理或唯一最优解。可下载复盘发给我点评。" : "请补上你的取舍理由与后续安排；程序不会替你判断业务目标。"}</p>` : "先填写你对初始题面的判断，点击核对后才显示答案。操作工作台不会自动揭晓这些核算。";
+    if (exercise.dynamic) {
+      if (n.checked) $("judgmentResult").querySelector("strong").textContent=`题面检查点核算：${results.filter(r=>r.correct).length} / ${results.length}项正确。`;
+      else $("judgmentResult").textContent="按题目给定的初始条件或假设检查点填写；答案不随下方实操状态改变。点击核对才揭晓核算。";
+    }
   }
   function renderChallenge(force=false) {
     const panel=$("challengePanel"), exercise=C.CASES[state.levelId];
@@ -54,6 +58,10 @@
     if (force || panel.dataset.level!==state.levelId) {
       panel.dataset.level=state.levelId;
       panel.innerHTML=`<div class="panel-title"><div><p class="eyebrow">CASE FILE / 初始题面始终保留</p><h2>${exercise.title}</h2></div><span>${exercise.focus}</span></div><p>${exercise.subtitle}</p><div class="case-columns"><div><h3>题目条件</h3><ul>${exercise.conditions.map(t=>`<li>${t}</li>`).join("")}</ul><h3>请先判断</h3><ol>${exercise.questions.map(t=>`<li>${t}</li>`).join("")}</ol><p class="small">优先级3最高；每轮只选一种阶段。除明确的输出上限外，不提前知道结束位置。实验用的输入/输出拆分仅用于运行，核算依据题面已知缓存位置。</p><a class="case-board-link" href="#board">去下方工作台操作验证 ↓</a></div><div><form id="judgmentForm"><fieldset><legend>我的资源核算（针对初始状态）</legend><div class="answer-grid">${exercise.checks.map(f=>`<label for="answer-${f.id}">${f.label}${f.type==="number" ? `<input id="answer-${f.id}" data-answer="${f.id}" type="number" min="0" step="1" value="${escape(n.answers[f.id] ?? "")}" inputmode="numeric" />` : `<select id="answer-${f.id}" data-answer="${f.id}"><option value="">请选择</option>${f.options.map(([v,t])=>`<option value="${v}" ${n.answers[f.id]===v ? "selected" : ""}>${t}</option>`).join("")}</select>`}</label>`).join("")}</div></fieldset><label for="strategyGoal">我的策略目标 / 选择</label><select id="strategyGoal"><option value="">请选择你的主要目标</option>${exercise.goals.map(t=>`<option ${n.goal===t ? "selected" : ""}>${t}</option>`).join("")}</select><label for="strategyNote">取舍理由与后续计划</label><textarea id="strategyNote" rows="4" maxlength="6000" placeholder="先安排什么？谁继续等待？下一轮块数如何变化？">${escape(n.reflection)}</textarea><p class="small">${exercise.reflection}</p><button class="primary" type="submit">核对我的判断</button></form><div id="judgmentResult" class="judgment-result" aria-live="polite"></div></div></div><div class="case-tools"><button id="caseHint" type="button">给我下一条提示</button><button id="caseReview" type="button">查看本次操作反馈</button><button id="caseReset" type="button">重置本题（可撤回）</button></div><ol id="caseHints" class="case-hints"></ol><div id="caseReviewResult" class="case-review" aria-live="polite"></div><details id="caseAnalysis" ${n.analysisOpen ? "open" : ""}><summary>查看完整参考解析（会揭晓核算答案）</summary><ol>${exercise.analysis.map(t=>`<li>${t}</li>`).join("")}</ol><p>参考路线不是唯一正确策略。自然结束长度只用于模拟，不应作为事前选择依据。</p></details>`;
+    }
+    if (exercise.dynamic) {
+      panel.querySelector("legend").textContent="我的资源核算（按题目给定检查点）";
+      panel.querySelector(".eyebrow").textContent="DYNAMIC CASE / 题面与到达计划始终保留";
     }
     $("caseHints").innerHTML=exercise.hints.slice(0,n.hints).map(t=>`<li>${t}</li>`).join("");
     $("caseHint").textContent=n.hints>=exercise.hints.length ? "提示已全部展开" : `给我第${n.hints+1}条提示`;
@@ -101,6 +109,13 @@
     $(location+"Map").innerHTML = html || '<span class="block disabled">未配置</span>';
     $(location+"Usage").textContent = `${G.usage(state,location)} / ${capacity}块`;
   }
+  function renderArrivals() {
+    const panel=$("arrivalForecast");
+    panel.hidden=!G.LEVELS[state.levelId].dynamic;
+    if (panel.hidden) return;
+    const labels={future:"未到达",prefill:"已到达 · 待读题",decode:"已到达 · 可输出",stored:"已到达 · 缓存换出",done:"已完成"};
+    panel.innerHTML=`<div class="panel-title"><div><p class="eyebrow">ARRIVAL PLAN / 题设已知的到达计划</p><h2>接下来谁会来？</h2></div><span>当前 T+${state.time}</span></div><p>到达发生在指定时间片结束时，下一轮才可调度。搬运期间新请求仍会到达，但本游戏不能中途打断搬运；最终输出长度保持隐藏。</p><ol class="arrival-timeline">${G.forecast(state).map(r=>`<li class="arrival-${r.status}" data-arrival-id="${r.id}"><b>T+${r.arrival}</b><strong>${r.id} · ${r.title}</strong><span>输入${r.prompt} Token · 优先级${r.priority}</span><em>${labels[r.status]}</em></li>`).join("")}</ol>`;
+  }
   function render() {
     const s = G.stats(state);
     $("timeMetric").textContent = state.time;
@@ -112,6 +127,7 @@
     $("arrivalInfo").textContent = future.length ? `后续还有${future.length}个请求，最早在第${Math.min(...future.map(r=>r.arrival))}片到达` : "所有请求均已到达";
     $("requests").innerHTML = G.visible(state).map(card).join("") || '<p class="small">暂时没有请求，可以空等1片。</p>';
     renderMemory("gpu",state.config.blocks); renderMemory("cpu",state.config.cpu); renderMemory("ssd",state.config.ssd);
+    renderArrivals();
     $("log").innerHTML = state.log.slice(-30).reverse().map(item=>`<li><b>T+${item.time}</b><span>${item.message}</span></li>`).join("");
     $("costs").innerHTML = [["有效安排的计算回合",`${state.turns}轮`],["读入 / 生成的总工作",`${state.work} Token`],["其中重复计算",`${state.recomputed} Token`],["抢占次数",`${state.preemptions}次`],["单向搬运总量",`${state.transferred}块`],["搬运消耗",`${state.transferTime}片`],["计算轮Token填充率",`${Math.round(s.utilization*100)}%`],["已完成请求平均耗时",s.done ? `${s.average.toFixed(1)}片` : "暂无"]].map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
     $("undo").disabled = history.length===0;
@@ -124,12 +140,13 @@
   }
   function accept(result, message) {
     if (!result.ok) { feedback(result.errors.join(" "),true); return; }
+    const arrived=result.state.requests.filter(r=>r.arrival>state.time && r.arrival<=result.state.time);
     history.push(G.clone(state));
     if (history.length>80) history.shift();
     state = result.state;
     draft = {};
     render();
-    feedback(message || state.log[state.log.length-1].message);
+    feedback((message || state.log[state.log.length-1].message)+(arrived.length ? ` 新到达：${arrived.map(r=>r.id+"（优先级"+r.priority+"）").join("、")}；下次决策可安排，请重新核对预算。` : ""));
   }
   $("requests").addEventListener("input", event=>{
     const id=event.target.dataset.allocate;
