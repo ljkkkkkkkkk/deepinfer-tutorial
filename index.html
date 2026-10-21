@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="面向零基础学习者的 DeepInfer 中文互动教程：从 AI 推理、KV Cache 到源码阅读。" />
+  <meta name="theme-color" content="#f6f2e8" />
+  <title>DeepInfer 从零到一</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="返回首页">
+      <span class="brand-mark" aria-hidden="true">D<span>I</span></span>
+      <span>DeepInfer <b>从零到一</b></span>
+    </a>
+    <nav class="topnav" aria-label="主导航">
+      <a href="#map">学习地图</a>
+      <a href="#lessons">课程</a>
+      <a href="#lab">动手实验</a>
+      <button class="progress-button" id="progressButton" type="button" aria-label="查看学习进度">
+        <span class="progress-ring" aria-hidden="true"><span id="progressRing"></span></span>
+        <span id="progressText">0 / 8</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow"><span>零基础友好</span> · 不要求先会 Linux 或 GPU</p>
+        <h1>别急着读源码。<br />先看懂一条请求<br /><em>怎样跑过大模型。</em></h1>
+        <p class="hero-lead">这是一门把复杂推理框架拆成日常语言的互动教程。你会从“模型为什么要一字一字输出”出发，最后真正看懂 DeepInfer 的引擎、调度器、KV Cache 和并行计算。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#lesson-1">从第 1 课开始 <span>→</span></a>
+          <button class="button ghost" id="resumeButton" type="button">继续上次学习</button>
+        </div>
+        <div class="promise-row" aria-label="课程特点">
+          <span>✓ 中文解释</span><span>✓ 互动图解</span><span>✓ 小步练习</span><span>✓ 自动保存进度</span>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="一次 AI 请求的旅程示意图">
+        <div class="visual-label">一次请求的旅程</div>
+        <div class="request-card request-input">
+          <span class="node-icon">你</span>
+          <div><small>输入</small><strong>“用一句话解释推理”</strong></div>
+        </div>
+        <div class="flow-line"><span></span><i>排队</i></div>
+        <div class="engine-board">
+          <div class="engine-title"><span>DeepInfer</span><small>推理引擎</small></div>
+          <div class="engine-grid">
+            <div><b>①</b><span>调度</span><small>谁先算？</small></div>
+            <div><b>②</b><span>缓存</span><small>记住什么？</small></div>
+            <div><b>③</b><span>执行</span><small>在哪张卡算？</small></div>
+            <div><b>④</b><span>采样</span><small>选哪个词？</small></div>
+          </div>
+          <div class="pulse-track"><span></span></div>
+        </div>
+        <div class="flow-line reverse"><span></span><i>逐字输出</i></div>
+        <div class="request-card request-output">
+          <span class="node-icon whale">AI</span>
+          <div><small>输出</small><strong id="typewriter">“推理，就是让训练好的模型开始回答。”</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="reality-strip" aria-label="学习前须知">
+      <div class="reality-number">01</div>
+      <div>
+        <h2>先说实话：你不需要买一台昂贵服务器</h2>
+        <p>当前 DeepInfer 官方版本面向 NVIDIA SM100 或华为昇腾 950 等高端硬件。但学习它的架构，普通电脑就够了：先读 Python 控制链路，用小模型理解原理，再把高端硬件当作最后一公里。</p>
+      </div>
+      <a href="#hardware-path">查看两条学习路径 →</a>
+    </section>
+
+    <section class="section map-section" id="map">
+      <div class="section-heading">
+        <p class="kicker">YOUR MAP</p>
+        <h2>你的学习地图</h2>
+        <p>每一站只解决一个核心问题。点开术语，不必背定义。</p>
+      </div>
+      <div class="map-grid">
+        <article class="map-card coral">
+          <span class="map-index">A</span>
+          <div class="map-time">第 1–2 周</div>
+          <h3>先懂“推理”</h3>
+          <p>模型、Token、Prefill、Decode，以及为什么回答是一个字一个字出来的。</p>
+          <div class="tag-row"><span>概念</span><span>无需编程</span></div>
+        </article>
+        <article class="map-card blue">
+          <span class="map-index">B</span>
+          <div class="map-time">第 3–4 周</div>
+          <h3>看懂“引擎”</h3>
+          <p>一次请求如何经过入口、排队、执行、采样，最后变成输出。</p>
+          <div class="tag-row"><span>Python</span><span>调用链</span></div>
+        </article>
+        <article class="map-card yellow">
+          <span class="map-index">C</span>
+          <div class="map-time">第 5–7 周</div>
+          <h3>拆开“效率”</h3>
+          <p>KV Cache、连续批处理和调度器怎样让 GPU 少等、多干活。</p>
+          <div class="tag-row"><span>缓存</span><span>调度</span></div>
+        </article>
+        <article class="map-card green">
+          <span class="map-index">D</span>
+          <div class="map-time">第 8–10 周</div>
+          <h3>理解“规模”</h3>
+          <p>MoE、多卡并行、通信和性能分析，理解生产级推理的全貌。</p>
+          <div class="tag-row"><span>多卡</span><span>性能</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section concept-section" id="lesson-1">
+      <div class="lesson-meta"><span>LESSON 01</span><span>约 12 分钟</span></div>
+      <div class="two-column">
+        <div>
+          <p class="kicker">FIRST PRINCIPLE</p>
+          <h2>训练像读书，<br />推理像答题</h2>
+          <p class="large-copy">大模型先通过训练学会语言规律。训练结束后，你给它一个问题，它使用学到的参数计算答案——这个“开始工作”的过程就叫<strong>推理</strong>。</p>
+          <div class="analogy">
+            <div><span>训练</span><strong>学生读完一整套教材</strong><small>耗时长，偶尔进行</small></div>
+            <div class="analogy-arrow">→</div>
+            <div><span>推理</span><strong>学生在考场现场答题</strong><small>每个用户请求都会发生</small></div>
+          </div>
+          <button class="complete-button" data-lesson="lesson-1" type="button"><span>○</span> 我理解了这一课</button>
+        </div>
+        <aside class="note-card">
+          <span class="tape" aria-hidden="true"></span>
+          <p class="note-title">小白防晕卡</p>
+          <dl>
+            <div><dt>模型</dt><dd>一套从大量数据中学到的数学参数</dd></div>
+            <div><dt>推理</dt><dd>使用这些参数生成结果</dd></div>
+            <div><dt>框架</dt><dd>组织模型高效工作的软件系统</dd></div>
+            <div><dt>DeepInfer</dt><dd>DeepSeek 开源的高性能推理框架</dd></div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section token-section" id="lesson-2">
+      <div class="lesson-meta"><span>LESSON 02</span><span>约 15 分钟</span></div>
+      <div class="section-heading left">
+        <p class="kicker">TOKEN BY TOKEN</p>
+        <h2>模型不是写整句话，<br />而是在猜“下一个小片段”</h2>
+      </div>
+      <div class="token-demo">
+        <div class="token-prompt">问题：DeepInfer 是什么？</div>
+        <div class="token-stage" id="tokenStage" aria-live="polite">
+          <span class="token fixed">Deep</span><span class="token fixed">Infer</span><span class="token fixed">是</span><span class="token candidate active">一个</span><span class="token candidate">高性能</span><span class="token candidate">推理</span><span class="token candidate">框架</span><span class="cursor"></span>
+        </div>
+        <div class="token-controls">
+          <button type="button" id="nextToken">生成下一个 Token</button>
+          <button type="button" id="resetTokens" class="plain">重新开始</button>
+          <span id="tokenStatus">已生成 4 / 7</span>
+        </div>
+      </div>
+      <div class="prefill-decode">
+        <div>
+          <div class="phase-icon prefill-icon">↳</div>
+          <h3>Prefill · 先读题</h3>
+          <p>一次处理完整问题，建立上下文。像快速读完题目并在脑中做好笔记。</p>
+          <small>通常更吃计算能力</small>
+        </div>
+        <div>
+          <div class="phase-icon decode-icon">…</div>
+          <h3>Decode · 再逐字回答</h3>
+          <p>每次产生一个新Token，再把它放回上下文，继续预测下一个。</p>
+          <small>通常更依赖显存带宽与调度</small>
+        </div>
+      </div>
+      <button class="complete-button" data-lesson="lesson-2" type="button"><span>○</span> 我理解了这一课</button>
+    </section>
+
+    <section class="section journey-section" id="lessons">
+      <div class="lesson-meta"><span>LESSON 03</span><span>核心课程</span></div>
+      <div class="section-heading">
+        <p class="kicker">FOLLOW THE REQUEST</p>
+        <h2>跟着一条请求，穿过 DeepInfer</h2>
+        <p>点击每一步，看看它在解决什么问题。</p>
+      </div>
+      <div class="journey">
+        <div class="journey-tabs" role="tablist" aria-label="请求处理步骤">
+          <button class="journey-tab active" data-step="0" role="tab" aria-selected="true"><b>01</b><span>入口</span></button>
+          <button class="journey-tab" data-step="1" role="tab" aria-selected="false"><b>02</b><span>调度</span></button>
+          <button class="journey-tab" data-step="2" role="tab" aria-selected="false"><b>03</b><span>执行</span></button>
+          <button class="journey-tab" data-step="3" role="tab" aria-selected="false"><b>04</b><span>采样</span></button>
+          <button class="journey-tab" data-step="4" role="tab" aria-selected="false"><b>05</b><span>输出</span></button>
+        </div>
+        <div class="journey-panel">
+          <div class="journey-code" aria-hidden="true">
+            <div class="code-window-bar"><i></i><i></i><i></i><span>request_flow.py</span></div>
+            <pre id="journeyCode"><code><span class="kw">llm</span> = LLM(model=<span class="str">"DeepSeek"</span>)
+output = llm.generate(
+    <span class="str">"解释什么是推理"</span>
+)</code></pre>
+          </div>
+          <div class="journey-copy">
+            <span id="journeyFile">deepinfer/entrypoints/llm.py</span>
+            <h3 id="journeyTitle">入口：把人话变成内部请求</h3>
+            <p id="journeyDesc">LLM 类接收你的文字、生成参数和模型配置，然后创建框架能管理的请求对象。</p>
+            <div class="question-box"><small>这一层回答的问题</small><strong id="journeyQuestion">“用户到底想让模型做什么？”</strong></div>
+          </div>
+        </div>
+      </div>
+      <button class="complete-button" data-lesson="lesson-3" type="button"><span>○</span> 我走完了请求链路</button>
+    </section>
+
+    <section class="section cache-section" id="lesson-4">
+      <div class="lesson-meta"><span>LESSON 04</span><span>互动图解</span></div>
+      <div class="two-column cache-layout">
+        <div>
+          <p class="kicker">KV CACHE</p>
+          <h2>给模型一张<br />“随手笔记”</h2>
+          <p class="large-copy">如果模型每生成一个字都重新读完整段对话，会浪费大量计算。KV Cache 保存已经读过内容的中间结果，让模型只计算新增加的部分。</p>
+          <div class="cache-toggle" role="group" aria-label="KV Cache 开关">
+            <button class="active" data-cache="on" type="button">开启缓存</button>
+            <button data-cache="off" type="button">关闭缓存</button>
+          </div>
+          <div class="cache-result">
+            <div><span>重复计算</span><strong id="repeatCalc">少</strong></div>
+            <div><span>生成速度</span><strong id="generationSpeed">更快</strong></div>
+            <div><span>显存占用</span><strong id="memoryUse">增加</strong></div>
+          </div>
+          <button class="complete-button" data-lesson="lesson-4" type="button"><span>○</span> 我理解了 KV Cache</button>
+        </div>
+        <div class="cache-visual" id="cacheVisual">
+          <div class="cache-title"><span>对话内容</span><span>已保存的中间结果</span></div>
+          <div class="cache-row"><div>今天天气</div><div class="cache-block filled">K₁ V₁</div></div>
+          <div class="cache-row"><div>适合跑步吗</div><div class="cache-block filled">K₂ V₂</div></div>
+          <div class="cache-row current"><div>建议几点出发</div><div class="cache-block computing">计算中…</div></div>
+          <div class="cache-arrow">只计算新内容 ↓</div>
+          <div class="cache-row answer"><div>建议傍晚…</div><div class="cache-block new">K₃ V₃</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section scheduler-section" id="lesson-5">
+      <div class="lesson-meta"><span>LESSON 05</span><span>系统思维</span></div>
+      <div class="section-heading left">
+        <p class="kicker">THE SCHEDULER</p>
+        <h2>调度器，就是 GPU 的餐厅领位员</h2>
+        <p>它不负责“做菜”，但决定谁先入座、怎样拼桌，以及桌子不够时怎么办。</p>
+      </div>
+      <div class="scheduler-board">
+        <div class="queue-zone">
+          <h3>等待队列 <small>waiting</small></h3>
+          <div id="waitingQueue" class="request-queue">
+            <div class="mini-request long"><b>A</b><span>长问题</span><small>780 tokens</small></div>
+            <div class="mini-request short"><b>B</b><span>短问题</span><small>24 tokens</small></div>
+            <div class="mini-request medium"><b>C</b><span>中问题</span><small>210 tokens</small></div>
+          </div>
+        </div>
+        <div class="schedule-action">
+          <button id="scheduleButton" type="button">安排这一轮 <span>→</span></button>
+          <small>Token预算：256</small>
+        </div>
+        <div class="gpu-zone">
+          <h3>GPU 执行批次 <small>running</small></h3>
+          <div class="gpu-slots" id="gpuSlots"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+          <p id="schedulerMessage">点击按钮，让调度器选择本轮任务。</p>
+        </div>
+      </div>
+      <div class="scheduler-lessons">
+        <div><b>连续批处理</b><span>不必等整批请求全部结束，有空位就加入新请求。</span></div>
+        <div><b>Token预算</b><span>每轮总工作量有限，调度器要在吞吐和延迟间取舍。</span></div>
+        <div><b>抢占与排队</b><span>资源不足时，暂停部分请求或让它继续等待。</span></div>
+      </div>
+      <button class="complete-button" data-lesson="lesson-5" type="button"><span>○</span> 我理解了调度器</button>
+    </section>
+
+    <section class="section parallel-section" id="lesson-6">
+      <div class="lesson-meta"><span>LESSON 06</span><span>进阶概念</span></div>
+      <div class="section-heading">
+        <p class="kicker">WORKING TOGETHER</p>
+        <h2>一张卡装不下，就让多张卡分工</h2>
+      </div>
+      <div class="parallel-cards">
+        <article>
+          <div class="parallel-art dp"><span>请求1</span><span>请求2</span><span>请求3</span></div>
+          <h3>DP · 分客人</h3>
+          <p>不同GPU处理不同请求，像多个窗口同时接待客人。</p>
+        </article>
+        <article>
+          <div class="parallel-art ep"><span>专家A</span><span>专家B</span><span>专家C</span><span>专家D</span></div>
+          <h3>EP · 分专家</h3>
+          <p>MoE的不同专家分散在多张卡上，每个Token被送到合适专家。</p>
+        </article>
+        <article>
+          <div class="parallel-art cp"><span>很长的</span><span>上下文</span><span>分段算</span></div>
+          <h3>CP · 分上下文</h3>
+          <p>把超长输入切开，让多张卡共同完成上下文计算。</p>
+        </article>
+      </div>
+      <div class="warning-callout"><strong>记住：</strong>多卡不等于自动更快。卡与卡之间要通信；当通信时间超过并行节省的计算时间，增加GPU反而可能变慢。</div>
+      <button class="complete-button" data-lesson="lesson-6" type="button"><span>○</span> 我分清了 DP、EP、CP</button>
+    </section>
+
+    <section class="section code-section" id="lesson-7">
+      <div class="lesson-meta"><span>LESSON 07</span><span>源码导航</span></div>
+      <div class="section-heading left">
+        <p class="kicker">READ THE SOURCE</p>
+        <h2>别从第一行读到最后一行</h2>
+        <p>真正有效的源码阅读，是追踪一条请求。按下面的顺序，每次只回答一个问题。</p>
+      </div>
+      <ol class="source-path">
+        <li><span>01</span><div><code>examples/offline_inference.py</code><strong>程序怎样启动？</strong></div></li>
+        <li><span>02</span><div><code>deepinfer/entrypoints/llm.py</code><strong>输入怎样变成请求？</strong></div></li>
+        <li><span>03</span><div><code>deepinfer/engine/llm_engine.py</code><strong>引擎每一步做什么？</strong></div></li>
+        <li><span>04</span><div><code>csrc/engine/scheduler.hpp</code><strong>谁能进入本轮计算？</strong></div></li>
+        <li><span>05</span><div><code>deepinfer/worker/cache_engine.py</code><strong>KV Cache怎样管理？</strong></div></li>
+        <li><span>06</span><div><code>deepinfer/model_executor/</code><strong>模型到底怎样执行？</strong></div></li>
+      </ol>
+      <div class="code-tip">
+        <span>源码阅读口诀</span>
+        <strong>找入口 → 下断点 → 看对象 → 记形状 → 画流程</strong>
+        <button id="copyMantra" type="button">复制口诀</button>
+      </div>
+      <button class="complete-button" data-lesson="lesson-7" type="button"><span>○</span> 我记住了阅读顺序</button>
+    </section>
+
+    <section class="section lab-section" id="lab">
+      <div class="lesson-meta"><span>LESSON 08</span><span>动手实验</span></div>
+      <div class="section-heading">
+        <p class="kicker">YOUR FIRST LAB</p>
+        <h2>第一次实验：不用GPU，模拟一个调度器</h2>
+        <p>复制下面的Python代码。它会按Token预算，从等待队列中选择本轮可以执行的请求。</p>
+      </div>
+      <div class="lab-grid">
+        <div class="code-window">
+          <div class="code-window-bar"><i></i><i></i><i></i><span>mini_scheduler.py</span><button class="copy-code" data-copy="labCode" type="button">复制</button></div>
+          <pre id="labCode"><code><span class="cm"># 三个请求还需要计算多少 Token</span>
+waiting = {<span class="str">"A"</span>: <span class="num">180</span>, <span class="str">"B"</span>: <span class="num">24</span>, <span class="str">"C"</span>: <span class="num">90</span>}
+budget = <span class="num">128</span>
+running = {}
+
+<span class="kw">for</span> name, tokens <span class="kw">in</span> waiting.items():
+    take = min(tokens, budget)
+    <span class="kw">if</span> take == <span class="num">0</span>:
+        <span class="kw">break</span>
+    running[name] = take
+    budget -= take
+
+print(running)
+<span class="cm"># 输出：{'A': 128}</span></code></pre>
+        </div>
+        <div class="lab-steps">
+          <h3>你要做的三次修改</h3>
+          <label><input type="checkbox" data-lab="1" /><span><b>实验 1</b>把预算从128改成256，观察哪些请求进入本轮。</span></label>
+          <label><input type="checkbox" data-lab="2" /><span><b>实验 2</b>把最短请求B放到最前面，比较等待体验。</span></label>
+          <label><input type="checkbox" data-lab="3" /><span><b>实验 3</b>规定每个请求每轮最多使用64 Token，让任务更公平。</span></label>
+          <div class="lab-insight"><small>你刚刚碰到的真实问题</small><p>吞吐优先、公平优先、短任务优先，没有永远正确的答案。调度器的价值，就是根据业务目标做取舍。</p></div>
+        </div>
+      </div>
+      <button class="complete-button" data-lesson="lesson-8" type="button"><span>○</span> 我完成了第一次实验</button>
+    </section>
+
+    <section class="section hardware-section" id="hardware-path">
+      <div class="section-heading">
+        <p class="kicker">CHOOSE YOUR PATH</p>
+        <h2>根据你的电脑，选择路径</h2>
+      </div>
+      <div class="path-switcher">
+        <button class="path-choice active" data-path="normal" type="button">
+          <span>普通电脑</span><small>没有高端GPU</small>
+        </button>
+        <button class="path-choice" data-path="server" type="button">
+          <span>服务器环境</span><small>SM100 / 昇腾950</small>
+        </button>
+      </div>
+      <div class="path-panel" id="pathPanel">
+        <div class="path-number">A</div>
+        <div>
+          <h3>普通电脑学习路线</h3>
+          <ol>
+            <li>先完成本站前六课，建立推理系统心智模型。</li>
+            <li>安装Python，用本站的迷你调度器练习基础语法。</li>
+            <li>用小模型或vLLM观察Prefill、Decode和KV Cache。</li>
+            <li>下载DeepInfer源码，静态追踪Python调用链。</li>
+            <li>把完整运行留到云端或合适服务器环境。</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section quiz-section" id="quiz">
+      <div class="section-heading">
+        <p class="kicker">CHECK YOURSELF</p>
+        <h2>3道题，检查是否真正理解</h2>
+      </div>
+      <form id="quizForm">
+        <fieldset data-answer="b">
+          <legend><span>01</span>KV Cache主要解决什么问题？</legend>
+          <label><input type="radio" name="q1" value="a" />让模型拥有更多参数</label>
+          <label><input type="radio" name="q1" value="b" />避免重复计算已经读过的上下文</label>
+          <label><input type="radio" name="q1" value="c" />自动购买更多GPU</label>
+          <p class="feedback"></p>
+        </fieldset>
+        <fieldset data-answer="c">
+          <legend><span>02</span>调度器最像下面哪个角色？</legend>
+          <label><input type="radio" name="q2" value="a" />厨师，负责真正计算答案</label>
+          <label><input type="radio" name="q2" value="b" />教材，保存模型知识</label>
+          <label><input type="radio" name="q2" value="c" />领位员，安排请求何时使用资源</label>
+          <p class="feedback"></p>
+        </fieldset>
+        <fieldset data-answer="a">
+          <legend><span>03</span>学习DeepInfer源码最合适的第一步是？</legend>
+          <label><input type="radio" name="q3" value="a" />从离线示例入口追踪一条请求</label>
+          <label><input type="radio" name="q3" value="b" />从最长的CUDA文件第一行开始读</label>
+          <label><input type="radio" name="q3" value="c" />先背完全部环境变量</label>
+          <p class="feedback"></p>
+        </fieldset>
+        <button class="button primary quiz-submit" type="submit">提交答案</button>
+        <div id="quizResult" class="quiz-result" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="final-section">
+      <div>
+        <p class="kicker">NEXT STEP</p>
+        <h2>你不需要一次学会所有东西。</h2>
+        <p>今天先理解一条请求。明天再理解一个缓存。系统能力，就是这样一层一层长出来的。</p>
+      </div>
+      <div class="final-actions">
+        <a class="button light" href="https://github.com/deepseek-ai/DeepInfer" target="_blank" rel="noreferrer">打开官方仓库 ↗</a>
+        <button class="button outline-light" id="resetProgress" type="button">重置学习进度</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand footer-brand"><span class="brand-mark">D<span>I</span></span><span>DeepInfer <b>从零到一</b></span></div>
+    <p>非官方中文入门教程 · 内容基于 DeepInfer 公开仓库整理</p>
+    <a href="#top">回到顶部 ↑</a>
+  </footer>
+
+  <div class="progress-drawer" id="progressDrawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <aside role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <button class="drawer-close" data-close-drawer type="button" aria-label="关闭">×</button>
+      <p class="kicker">YOUR PROGRESS</p>
+      <h2 id="drawerTitle">我的学习进度</h2>
+      <div class="drawer-meter"><span id="drawerMeter"></span></div>
+      <p id="drawerSummary">已完成 0 / 8 课</p>
+      <ol id="progressList"></ol>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./script.js"></script>
+</body>
+</html>
