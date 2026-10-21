@@ -112,7 +112,7 @@ test("SSD latency advances arrivals without computing unseen requests",()=>{
   assert.ok(s.log.some(item=>item.message.startsWith("新请求C")));
 });
 test("all three levels can finish without hidden-length knowledge or preemption",()=>{
-  for (const id of Object.keys(G.LEVELS)) {
+  for (const id of Object.keys(G.LEVELS).filter(id=>!G.LEVELS[id].challenge)) {
     let s=G.create(id);
     for (let attempt=0;attempt<150 && !G.finished(s);attempt++) {
       const ready=G.visible(s).filter(r=>!r.done && G.status(r)==="decode");
@@ -131,4 +131,102 @@ test("all three levels can finish without hidden-length knowledge or preemption"
     assert.equal(G.idle(s).ok,false);
     invariant(s);
   }
+});
+
+test("four challenges match the published initial budgets and states",()=>{
+  const expected={challenge1:{gpu:6,cpu:0,blocks:8,cached:[12,7,4,0]},challenge2:{gpu:6,cpu:1,blocks:6,cached:[12,8,4]},challenge3:{gpu:6,cpu:0,blocks:10,cached:[13,4,4]},challenge4:{gpu:6,cpu:0,blocks:6,cached:[8,8,5]}};
+  for (const [id,e] of Object.entries(expected)) {
+    const s=G.create(id);
+    assert.equal(s.config.tokens,6); assert.equal(s.config.blocks,e.blocks);
+    assert.equal(G.usage(s),e.gpu); assert.equal(G.usage(s,"cpu"),e.cpu);
+    assert.deepEqual(s.requests.map(r=>r.cached),e.cached);
+    assert.throws(()=>G.create(id,{tokens:8}),/固定/);
+    invariant(s);
+  }
+});
+test("challenge 1 compares legal plans and exposes the conditional block-boundary trap",()=>{
+  const initial=G.create("challenge1");
+  const a=G.plan(initial,"decode",[{id:"A",tokens:1},{id:"B",tokens:1},{id:"C",tokens:1}]);
+  const b=G.plan(initial,"prefill",[{id:"D",tokens:6}]);
+  assert.equal(a.ok,true); assert.equal(a.tokens,3); assert.equal(a.extraBlocks,2);
+  assert.equal(b.ok,true); assert.equal(b.tokens,6); assert.equal(b.extraBlocks,2);
+  let s=run(initial,"prefill",{D:6});
+  s=run(s,"decode",{B:1}); s=run(s,"prefill",{D:2});
+  assert.equal(G.usage(s),8); assert.equal(s.requests.some(r=>r.done),false);
+  for(const r of s.requests) assert.equal(G.plan(s,G.status(r),[{id:r.id,tokens:1}]).ok,false);
+  assert.equal(G.reclaim(s,"A","cpu").ok,false);
+  assert.equal(G.reclaim(s,"A","ssd").ok,false);
+});
+test("challenge 2 accounts for another task's reserved CPU block",()=>{
+  const s=G.create("challenge2"), snapshot=G.clone(s);
+  for (const r of s.requests) assert.equal(G.plan(s,G.status(r),[{id:r.id,tokens:1}]).ok,false);
+  assert.equal(G.reclaim(s,"A","cpu").ok,false);
+  assert.equal(G.reclaim(s,"B","cpu").ok,false);
+  const offloaded=G.reclaim(s,"C","cpu"); assert.equal(offloaded.ok,true);
+  assert.equal(G.usage(offloaded.state,"cpu"),2); assert.equal(offloaded.state.time,1);
+  const restored=G.reclaim(offloaded.state,"C","restore"); assert.equal(restored.ok,true);
+  assert.equal(G.usage(restored.state,"cpu"),1); assert.equal(restored.state.time,2);
+  assert.equal(G.reclaim(s,"B","ssd").state.time,2);
+  assert.deepEqual(s,snapshot);
+});
+test("challenge 3 preserves inherited wait times and supports both legitimate two-round routes",()=>{
+  const s=G.create("challenge3");
+  assert.deepEqual(s.requests.map(r=>s.time-Math.max(r.arrival,r.lastService)),[0,2,7]);
+  const d=G.plan(s,"decode",[{id:"A",tokens:1},{id:"B",tokens:1}]);
+  const p=G.plan(s,"prefill",[{id:"C",tokens:6}]);
+  assert.equal(d.tokens,2); assert.equal(d.extraBlocks,1); assert.equal(d.ok,true);
+  assert.equal(p.tokens,6); assert.equal(p.extraBlocks,2); assert.equal(p.ok,true);
+  const route1=run(run(s,"decode",{A:1,B:1}),"prefill",{C:6});
+  const route2=run(run(s,"prefill",{C:6}),"decode",{A:1,B:1,C:1});
+  assert.equal(route1.decisions[0].phase,"decode"); assert.equal(route2.decisions[0].phase,"prefill");
+  assert.equal(route1.requests[2].generated,0); assert.equal(route2.requests[2].generated,1);
+});
+test("challenge 4 rejects borrowing an inevitable completion's future release",()=>{
+  const s=G.create("challenge4"), snapshot=G.clone(s);
+  assert.equal(s.requests[0].knownLimit,4);
+  const check=G.plan(s,"decode",[{id:"A",tokens:1}]);
+  assert.equal(check.extraBlocks,1); assert.equal(check.ok,false);
+  assert.equal(G.execute(s,"decode",[{id:"A",tokens:1}]).ok,false); assert.deepEqual(s,snapshot);
+  assert.equal(G.plan(s,"decode",[{id:"C",tokens:1}]).ok,true);
+  for(const [id,n,rounds] of [["B",8,2],["C",5,1]]) {
+    let t=G.reclaim(s,id,"recompute").state;
+    t=run(t,"decode",{A:1}); assert.equal(t.requests[0].done,true); assert.equal(G.usage(t),2);
+    for(let left=n;left>0;left-=6) t=run(t,"prefill",{[id]:Math.min(6,left)});
+    assert.equal(t.recomputed,n);
+    assert.equal(t.decisions.filter(d=>d.type==="compute" && d.phase==="prefill").length,rounds);
+  }
+});
+test("decision history is atomic and old saves without it still run",()=>{
+  const s=G.create("challenge4"); delete s.decisions;
+  assert.equal(G.execute(s,"decode",[{id:"A",tokens:1}]).ok,false);
+  assert.equal(s.decisions,undefined);
+  let t=G.reclaim(s,"C","recompute").state;
+  t=run(t,"decode",{A:1}); t=G.idle(t).state;
+  assert.deepEqual(t.decisions.map(d=>d.type),["memory","compute","idle"]);
+  assert.equal(t.decisions[0].cached,5); assert.equal(t.decisions[1].extraBlocks,1);
+});
+test("every challenge has a complete feasible continuation",()=>{
+  function swap(s,id,destination) { const r=G.reclaim(s,id,destination); assert.equal(r.ok,true,r.errors?.join(" ")); invariant(r.state); return r.state; }
+  function finish(s) {
+    for(let attempt=0;attempt<250 && !G.finished(s);attempt++) {
+      let moved=false;
+      for(const phase of ["decode","prefill"]) {
+        const r=G.visible(s).find(r=>G.status(r)===phase && !r.done && G.plan(s,phase,[{id:r.id,tokens:1}]).ok);
+        if(r) { s=run(s,phase,{[r.id]:1}); moved=true; break; }
+      }
+      if(!moved) {
+        const stored=s.requests.find(r=>!r.done && r.location!=="gpu" && G.reclaim(s,r.id,"restore").ok);
+        if(stored) { s=swap(s,stored.id,"restore"); continue; }
+        const victim=s.requests.find(r=>!r.done && r.location==="gpu" && r.cached>0);
+        assert.ok(victim,"a cache can be reclaimed"); s=swap(s,victim.id,"recompute");
+      }
+    }
+    assert.equal(G.finished(s),true,`${s.levelId} solvable`); assert.equal(G.usage(s),0); invariant(s);
+  }
+  finish(G.create("challenge1"));
+  let s=swap(G.create("challenge2"),"C","cpu");
+  s=run(s,"decode",{A:1}); s=run(s,"decode",{A:1}); s=run(s,"decode",{A:1});
+  s=swap(s,"C","restore"); finish(s);
+  finish(run(run(G.create("challenge3"),"decode",{A:1,B:1}),"prefill",{C:6}));
+  finish(run(swap(G.create("challenge4"),"C","recompute"),"decode",{A:1}));
 });

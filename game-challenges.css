@@ -1,0 +1,49 @@
+.challenge-entry,.challenge-panel{border:1px solid var(--line);background:var(--white);padding:1.4rem;margin-bottom:1.5rem}
+.challenge-entry>p{color:#4e5a65;font-size:.88rem;max-width:850px}
+.challenge-launchers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;margin-top:1rem}
+.challenge-launchers button{display:flex;align-items:center;gap:.7rem;text-align:left;min-height:86px}
+.challenge-launchers button>b{font-size:1.5rem;color:var(--blue);font-variant-numeric:tabular-nums}
+.challenge-launchers button>span{font-size:.85rem;font-weight:700}
+.challenge-launchers small{display:block;font-size:.7rem;font-weight:400;color:#4e5a65;margin-top:.3rem}
+.challenge-panel{border-top:5px solid var(--blue);scroll-margin-top:16px}
+.challenge-panel>.panel-title h2{font-size:1.6rem}
+.challenge-panel>.panel-title>span{color:var(--blue);max-width:260px}
+.case-columns{display:grid;grid-template-columns:1fr 1fr;gap:2.2rem;margin-top:1.5rem}
+.case-columns>div{min-width:0}
+.case-columns h3,.case-review h3{font-size:1rem;margin:1.1rem 0 .6rem}
+.case-columns ul,.case-columns ol,.case-hints,.case-review ul{padding-left:1.25rem;margin:.5rem 0}
+.case-columns li,.case-review li,.case-hints li{margin:.7rem 0;line-height:1.75}
+.case-board-link{display:inline-block;padding:.65rem 0;font-weight:700;min-height:44px}
+#judgmentForm{padding:1.1rem;background:#f0eee5;border:1px solid var(--line)}
+#judgmentForm fieldset{border:0;padding:0;margin:0 0 1.2rem;min-width:0}
+#judgmentForm legend{font-size:1rem;font-weight:750;margin-bottom:.8rem}
+.answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+#judgmentForm label{display:block;font-size:.85rem;font-weight:600;margin-bottom:.3rem}
+#judgmentForm input,#judgmentForm select,#judgmentForm textarea{font:inherit;color:var(--ink);background:var(--white);border:1px solid #969e9e;border-radius:4px;width:100%;min-width:0;min-height:44px;padding:.55rem .65rem}
+.answer-grid input,.answer-grid select{display:block;margin-top:.35rem}
+#strategyGoal{margin-bottom:1rem}
+#strategyNote{resize:vertical}
+#judgmentForm .small{font-size:.8rem;color:#4e5a65}
+#judgmentForm button{min-height:44px}
+.judgment-result{font-size:.87rem;margin-top:1rem;color:#43505a;overflow-wrap:anywhere}
+.judgment-result ul{list-style:none;padding-left:0}
+.judgment-result li{padding:.8rem;border:1px solid var(--line);border-left-width:4px;background:#f7f6f0}
+.judgment-result li b,.judgment-result li span{display:block}
+.judgment-result li span{margin-top:.35rem}
+.judgment-result li.check-correct{border-left-color:#28724b}
+.judgment-result li.check-wrong{border-left-color:#b24732}
+.case-tools{display:flex;flex-wrap:wrap;gap:.6rem;border-top:1px solid var(--line);padding-top:1.2rem;margin-top:1.4rem}
+.case-tools button{min-height:44px;font-size:.85rem}
+.case-hints:not(:empty){padding:1rem 1rem 1rem 2rem;background:#fff3c7}
+.case-review{margin-top:1rem;padding:1rem;background:#edf1e9;border-left:3px solid var(--green);font-size:.9rem}
+#caseAnalysis{font-size:.95rem;border:1px solid var(--line);padding:.8rem 1rem;margin-top:1rem}
+#caseAnalysis summary{min-height:44px;display:flex;align-items:center}
+#caseAnalysis summary::before{content:"▸";margin-right:.5rem}
+#caseAnalysis[open] summary::before{content:"▾"}
+#caseAnalysis li{line-height:1.8}
+.block.reserved{background:#6b747c;color:white;border-style:solid;border-color:#6b747c}
+.request-actions button{min-height:44px}
+.completion a{color:#f2c94c;display:inline-block;min-height:44px;padding:.5rem 0}
+@media(max-width:1050px){.challenge-launchers{grid-template-columns:1fr 1fr}.case-columns{gap:1.3rem}}
+@media(max-width:780px){.case-columns{grid-template-columns:1fr}.challenge-panel,.challenge-entry{padding:1.1rem}.case-columns li,.case-review li,.case-hints li{font-size:1rem}.case-tools button{flex:1;min-width:135px}.challenge-launchers button{min-height:88px}.case-columns{gap:.5rem}}
+@media(max-width:430px){.challenge-launchers{grid-template-columns:1fr}.answer-grid{grid-template-columns:1fr}.challenge-panel>.panel-title{display:block}.challenge-panel>.panel-title>span{display:block;text-align:left;max-width:none}.case-tools{display:grid;grid-template-columns:1fr}.challenge-panel>p{font-size:1rem}#judgmentForm{padding:.8rem}#judgmentForm input,#judgmentForm select,#judgmentForm textarea{font-size:16px}.challenge-entry .panel-title{display:block}.challenge-entry .panel-title>span{display:block;max-width:none;text-align:left}}

@@ -30,6 +30,47 @@
         { id: "C", title: "新来的文档", prompt: 12, goal: 3, priority: 2, arrival: 1 },
         { id: "D", title: "稍后到达的任务", prompt: 4, goal: 2, priority: 1, arrival: 5 }
       ]
+    },
+    challenge1: {
+      name: "进阶1 · 合法，但安全吗？", challenge: true,
+      description: "比较同批Decode与给D读入6个Token：本轮放得下，不代表下一轮还有路。", target: 30,
+      config: { tokens: 6, blocks: 8, blockSize: 4, cpu: 0, ssd: 0, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "跨块边界的回答", prompt: 8, generated: 4, ready: true, goal: 7, priority: 2, arrival: 0 },
+        { id: "B", title: "高优先级请求", prompt: 4, generated: 3, ready: true, goal: 6, priority: 3, arrival: 0 },
+        { id: "C", title: "刚读完题的请求", prompt: 4, ready: true, goal: 4, priority: 1, arrival: 0 },
+        { id: "D", title: "等待读入的新问题", prompt: 10, goal: 3, priority: 2, arrival: 0 }
+      ]
+    },
+    challenge2: {
+      name: "进阶2 · 满载后的腾挪", challenge: true,
+      description: "GPU已满，CPU总共2块但只空闲1块。比较换出目的地与重算代价。", target: 30,
+      config: { tokens: 6, blocks: 6, blockSize: 4, cpu: 2, cpuReserved: 1, ssd: 8, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "高优先级回答", prompt: 8, generated: 4, ready: true, goal: 7, priority: 3, arrival: 0 },
+        { id: "B", title: "另一条活跃回答", prompt: 4, generated: 4, ready: true, goal: 7, priority: 2, arrival: 0 },
+        { id: "C", title: "尚未读完的上下文", prompt: 12, cached: 4, goal: 3, priority: 1, arrival: 0 }
+      ]
+    },
+    challenge3: {
+      name: "进阶3 · 谁值得先服务？", challenge: true,
+      description: "高优先级首Token、久等的读题请求、连续输出之间没有唯一权重。先选目标再排两轮。", target: 30,
+      config: { tokens: 6, blocks: 10, blockSize: 4, cpu: 0, ssd: 0, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "持续输出的回答", prompt: 8, generated: 5, ready: true, goal: 9, priority: 1, arrival: 0 },
+        { id: "B", title: "等首Token的高优请求", prompt: 4, ready: true, goal: 3, priority: 3, arrival: -2 },
+        { id: "C", title: "已经久等的读题请求", prompt: 10, cached: 4, goal: 3, priority: 2, arrival: -7 }
+      ]
+    },
+    challenge4: {
+      name: "进阶4 · 结束前也要有空间", challenge: true,
+      description: "A再生成1个Token就触发输出上限，但GPU已满。先检查峰值，再选择牺牲谁的缓存。", target: 30,
+      config: { tokens: 6, blocks: 6, blockSize: 4, cpu: 0, ssd: 0, cpuRate: 2, ssdRate: 1 },
+      requests: [
+        { id: "A", title: "已知即将达到长度上限", prompt: 5, generated: 3, ready: true, goal: 4, knownLimit: 4, priority: 2, arrival: 0 },
+        { id: "B", title: "缓存较长的回答", prompt: 7, generated: 1, ready: true, goal: 4, priority: 2, arrival: 0 },
+        { id: "C", title: "缓存较短的回答", prompt: 4, generated: 1, ready: true, goal: 4, priority: 2, arrival: 0 }
+      ]
     }
   };
 
@@ -41,12 +82,15 @@
   }
   function usage(state, location = "gpu") {
     return state.requests.filter(r => !r.done && r.location === location)
-      .reduce((total, r) => total + blocksFor(r.cached, state), 0);
+      .reduce((total, r) => total + blocksFor(r.cached, state), location === "cpu" ? state.config.cpuReserved || 0 : 0);
   }
   function visible(state) { return state.requests.filter(r => r.arrival <= state.time); }
   function finished(state) { return state.requests.every(r => r.done); }
   function create(levelId = "start", overrides = {}) {
     const level = LEVELS[levelId] || LEVELS.start;
+    if (level.challenge && Object.entries(overrides).some(([key,value]) => value !== level.config[key])) {
+      throw new Error("情景题资源固定，不能修改题目预算。普通关卡仍可自定义。");
+    }
     const config = { ...level.config, ...overrides };
     for (const key of ["tokens", "blocks", "blockSize", "cpuRate", "ssdRate"]) {
       if (!Number.isInteger(config[key]) || config[key] < 1) throw new Error("资源配置必须为正整数");
@@ -54,15 +98,17 @@
     for (const key of ["cpu", "ssd"]) {
       if (!Number.isInteger(config[key]) || config[key] < 0) throw new Error("存储容量不能为负数");
     }
+    if (!Number.isInteger(config.cpuReserved || 0) || (config.cpuReserved || 0) < 0 || (config.cpuReserved || 0) > config.cpu) throw new Error("CPU固定占用不能超过容量");
     const state = {
       version: 1, levelId, config, time: 0, turns: 0,
       work: 0, capacity: 0, recomputed: 0, transferred: 0, transferTime: 0, preemptions: 0,
       requests: level.requests.map(source => {
         const generated = source.generated || 0;
-        const cached = source.ready ? source.prompt + generated : 0;
+        const cached = source.cached ?? (source.ready ? source.prompt + generated : 0);
         return { ...source, generated, cached, location: "gpu", done: false, completedAt: null,
           lastService: source.arrival, firstService: source.ready ? 0 : null, replayUntil: 0 };
       }),
+      decisions: [],
       log: [{ time: 0, message: "你已接班。先检查请求阶段、Token预算和GPU缓存块，再提交一轮计划。" }]
     };
     if (usage(state) > config.blocks) throw new Error("初始活跃缓存超过GPU块数，请增加块预算");
@@ -139,6 +185,7 @@
     state.turns += 1;
     state.work += check.tokens;
     state.capacity += state.config.tokens;
+    (state.decisions ||= []).push({ type: "compute", time: state.time, phase, allocations: check.changes.map(r => ({ id: r.id, tokens: r.tokens })), extraBlocks: check.extraBlocks });
     advance(state, 1);
     state.log.push({ time: state.time, message: `${phase === "prefill" ? "Prefill" : "Decode"}完成：${messages.join("；")}。` });
     return { ok: true, state, check };
@@ -160,6 +207,7 @@
     const state = clone(original);
     const r = state.requests.find(item => item.id === id);
     const blocks = blocksFor(r.cached, state);
+    const decision = { type: "memory", time: state.time, id, destination, cached: r.cached, blocks };
     if (destination === "recompute") {
       const dropped = r.cached;
       r.replayUntil = Math.max(r.replayUntil, dropped);
@@ -176,11 +224,13 @@
       advance(state, cost);
       state.log.push({ time: state.time, message: `${r.id}的${blocks}块缓存从${from.toUpperCase()}搬到${r.location.toUpperCase()}，耗时${cost}片，缓存内容保留。${destination === "restore" ? "GPU空间已重新占用。" : "GPU空间现已释放。"}` });
     }
+    (state.decisions ||= []).push(decision);
     return { ok: true, state };
   }
   function idle(original) {
     if (finished(original)) return { ok: false, state: original, errors: ["本关已完成。"] };
     const state = clone(original);
+    (state.decisions ||= []).push({ type: "idle", time: state.time });
     advance(state, 1);
     state.log.push({ time: state.time, message: "空等1片。已有缓存仍然占用资源，没有自动清空。" });
     return { ok: true, state };
