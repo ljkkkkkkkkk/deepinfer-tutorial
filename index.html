@@ -20,6 +20,7 @@
       <a href="#map">学习地图</a>
       <a href="#lessons">课程</a>
       <a href="#lab">动手实验</a>
+      <a href="./game.html">调度器小游戏 ↗</a>
       <button class="progress-button" id="progressButton" type="button" aria-label="查看学习进度">
         <span class="progress-ring" aria-hidden="true"><span id="progressRing"></span></span>
         <span id="progressText">0 / 8</span>
@@ -280,6 +281,7 @@ output = llm.generate(
         <div><b>分块需要明确开启</b><span>关闭分块时不能只读A的一部分。若单轮上限小于最长输入，需要调整配置；不能靠反复等待解决。</span></div>
       </div>
       <details class="scheduler-real"><summary>那 DeepInfer 实际怎样调度？</summary><p>当前开源普通引擎（NORMAL）的一步选择 Prefill 或 Decode，多卡还需协调步骤类型。Prefill通常检查等待队列头部，在设定时机尝试接入新请求；重算请求可能插回队头。</p><p>Decode在资源充足时让多个请求同批推进；其选择代码按已输出Token数排序，从较少的一端考虑，缓存紧张时可从较多的一端抢占。它不知道谁马上能回答完。被抢占后，按配置与请求类型等待重算或结束，并非无代价恢复。</p><p>这是阶段切换与资源检查的组合，并非永远“短问题优先”。上述说明不等同于DeepSeek线上服务的全部策略。<a href="https://github.com/deepseek-ai/DeepInfer/blob/main/csrc/engine/scheduler.hpp" target="_blank" rel="noreferrer">查看公开调度源码 ↗</a></p></details>
+      <p><a class="button primary" href="./game.html">你来当调度器：进入训练场 →</a></p>
       <button class="complete-button" data-lesson="lesson-5" type="button"><span>○</span> 我理解了调度器</button>
     </section>
 

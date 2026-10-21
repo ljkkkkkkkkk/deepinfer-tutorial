@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#17212b" />
+  <meta name="description" content="你来当大模型调度器：分配Token、管理KV缓存块，选择Prefill、Decode、抢占重算或CPU/SSD卸载。" />
+  <title>调度器训练场 · DeepInfer 从零到一</title>
+  <link rel="stylesheet" href="./game.css?v=1" />
+</head>
+<body>
+  <a class="skip" href="#board">跳到调度台</a>
+  <header><a class="brand" href="./index.html#lesson-5"><span class="logo">DI</span> DeepInfer <b>调度器训练场</b></a><a class="back" href="./index.html#lesson-5">← 回到第5课</a></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">SCHEDULER ON DUTY / 轮到你接班</p><h1>谁先算，<br /><em>由你决定。</em></h1><p>你有有限的 Token 和缓存块。让请求完成，也别让其他人一直等。每一步都能撤回，做错时会解释原因。</p></div><div class="intro-note"><span>你的第一步</span><strong>选阶段 → 分配任务 → 执行本轮</strong><p>Prefill 读入已知上下文；Decode 继续生成；KV Cache 跨轮保留，只有任务完成、换出或抢占才释放GPU块。</p><small>教学模拟器 · 不调用真实模型 · 非 DeepInfer 调度器复刻</small></div></section>
+
+    <section class="setup" aria-label="关卡和资源设置"><div><label for="level">选择关卡</label><select id="level"><option value="start">01 · 第一班调度</option><option value="pressure">02 · 显存告急</option><option value="storage">03 · 搬运还是重算</option></select></div><div><label for="tokenConfig">每轮 Token</label><select id="tokenConfig"><option>4</option><option>6</option><option selected>8</option><option>12</option><option>16</option></select></div><div><label for="blockConfig">GPU 缓存块</label><select id="blockConfig"><option>4</option><option>5</option><option>6</option><option selected>8</option><option>10</option><option>12</option></select></div><div><label for="cpuConfig">CPU 块容量</label><select id="cpuConfig"><option>0</option><option>2</option><option>3</option><option selected>4</option><option>8</option></select></div><button id="newGame" class="primary">按当前配置开局</button><p id="levelDescription"></p></section>
+
+    <section id="board" class="dashboard" aria-label="调度工作台">
+      <div class="metrics"><div><span>当前时间片</span><strong id="timeMetric">0</strong></div><div><span>本轮 Token 预算</span><strong id="tokenMetric">8</strong></div><div><span>GPU 空闲块</span><strong id="freeMetric">8 / 8</strong></div><div><span>已完成请求</span><strong id="doneMetric">0 / 3</strong></div><div><span>最长未服务</span><strong id="waitMetric">0 片</strong></div></div>
+      <div class="workspace"><div class="requests-panel"><div class="panel-title"><div><p class="eyebrow">REQUEST QUEUE</p><h2>请求看板</h2></div><span id="arrivalInfo"></span></div><p class="small">每块容纳4个已计算位置。下一步是否需要新块，要看当前块还有没有空位。最终输出长度隐藏；优先级3最高，由你决定是否照顾。</p><div id="requests"></div></div>
+      <aside class="control-panel"><p class="eyebrow">YOUR PLAN</p><h2>安排本轮</h2><div class="phase-switch" role="group" aria-label="选择计算阶段"><button id="choosePrefill" aria-pressed="true">Prefill<span>读题 / 重建缓存</span></button><button id="chooseDecode" aria-pressed="false">Decode<span>继续生成</span></button></div><p id="phaseHelp" class="small"></p><div id="planMeter"></div><div id="planStatus" role="status" aria-live="polite">选择请求后查看资源检查。</div><button id="execute" class="primary execute">执行本轮 →</button><div class="secondary-controls"><button id="hint">给我一个提示</button><button id="idle">空等1片</button><button id="undo">撤回一步</button></div><div id="feedback" aria-live="polite"></div><details><summary>怎么玩？展开看规则</summary><ol><li>Prefill可以给一个或多个请求分块读题，合计不能超过Token预算。</li><li>Decode每个选中的请求生成1个Token。同一轮可选多个，不能混入Prefill。</li><li>本例按实际已计算长度逐步分配块，块数=长度÷4后向上取整；与真实框架的预留策略可能不同。</li><li>抢占保留Token、清空缓存，之后要重新Prefill。释放立即生效；重建会消耗未来预算。</li><li>CPU/SSD换出保留缓存。CPU每片搬运的块数按关卡设定，SSD为1块/片。为方便手算，搬运期间暂停本工作台计算，未模拟异步重叠。</li><li>未完成请求的缓存完整保存；恢复时GPU必须能接住全部块。SSD容量固定8块。</li><li>Prefill本身不产出首Token；Decode时生成的下一个位置立即计入缓存。这是统一教学记账方式。</li><li>你可以自由选择先服务谁，游戏不强制FCFS，也不套用DeepInfer的抢占排序。优先级和等待时间供你权衡。</li><li>换出后再取回不会刷新服务时间。时间片是教学单位，不对应真实毫秒。</li></ol></details></aside></div>
+
+      <section class="memory-panel"><div class="panel-title"><div><p class="eyebrow">CACHE MAP</p><h2>缓存去哪了？</h2></div><span>彩色块跨轮保留 · 空白块可分配</span></div><div class="memory-row"><b>GPU / HBM</b><div id="gpuMap" class="block-map"></div><span id="gpuUsage"></span></div><div class="memory-row"><b>CPU 内存</b><div id="cpuMap" class="block-map"></div><span id="cpuUsage"></span></div><div class="memory-row"><b>SSD</b><div id="ssdMap" class="block-map"></div><span id="ssdUsage"></span></div><p class="small">这里的GPU容量只指分给KV Cache的预算，已排除模型权重等开销。方格表示逻辑缓存块，不代表GPU数量。</p></section>
+      <section id="completion" class="completion" hidden></section>
+      <div class="bottom-grid"><section class="log-panel"><div class="panel-title"><div><p class="eyebrow">DECISION LOG</p><h2>你的决策记录</h2></div><button id="exportLog">下载复盘</button></div><ol id="log"></ol></section><section class="review-panel"><p class="eyebrow">TRADE-OFFS</p><h2>这局的代价</h2><dl id="costs"></dl><p class="small">填满Token预算不是唯一目标：少量Decode也可能让一个请求及时完成。评分只是本游戏的参考指标，不代表工业系统性能。</p><p class="small" id="saveStatus">进度保存在当前浏览器。</p></section></div>
+    </section>
+  </main><footer>调度器训练场 · 中文教学模拟器 <a href="./index.html#lesson-5">回顾调度器课程 ↗</a></footer>
+  <script src="./game-engine.js?v=1"></script><script src="./game.js?v=1"></script>
+</body>
+</html>
