@@ -246,7 +246,6 @@ h1 em { color: var(--blue); font-style: normal; }
 .mini-request { display: grid; grid-template-columns: 38px 1fr auto; gap: .7rem; align-items: center; padding: .7rem; border: 1px solid var(--line); transition: opacity .3s, transform .3s; }
 .mini-request b { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: white; background: var(--blue); font: .75rem var(--mono); }
 .mini-request small { color: var(--muted); font: .65rem var(--mono); }
-.mini-request.scheduled { opacity: .25; transform: translateX(20px); }
 .schedule-action { text-align: center; }
 .schedule-action button { border: 0; padding: .8rem 1rem; color: white; background: var(--coral); cursor: pointer; font-weight: 700; }
 .schedule-action small { display: block; margin-top: .5rem; color: var(--muted); font: .6rem var(--mono); }
@@ -259,6 +258,26 @@ h1 em { color: var(--blue); font-style: normal; }
 .scheduler-lessons b, .scheduler-lessons span { display: block; }
 .scheduler-lessons b { margin-bottom: .4rem; }
 .scheduler-lessons span { color: var(--muted); font-size: .8rem; }
+.scheduler-assumptions { margin: 0 0 1.2rem; font-size: .85rem; }
+.scheduler-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem; padding: 1rem; border: 1px solid var(--line); border-bottom: 0; background: var(--white); }
+.scheduler-controls label { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .85rem; }
+.scheduler-controls select { padding: .35rem .6rem; color: var(--ink); background: var(--paper); border: 1px solid var(--line); font: inherit; }
+.scheduler-controls input { accent-color: var(--blue); }
+.schedule-action button.reset-schedule { display: block; margin: .7rem auto 0; background: var(--paper-deep); color: var(--ink); font-size: .75rem; }
+.allocation-bar { display: flex; min-height: 60px; width: 100%; background: var(--paper-deep); border: 1px solid var(--line); }
+.allocation-bar span { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap; font: .72rem var(--mono); }
+.allocation-a { background: var(--blue); color: white; }
+.allocation-b { background: var(--coral); color: var(--ink); }
+.allocation-c { background: var(--green); color: white; }
+.allocation-empty { flex: 1; color: var(--muted); }
+.scheduler-table-wrap { overflow-x: auto; margin-top: 1.2rem; }
+.scheduler-table { width: 100%; min-width: 540px; border-collapse: collapse; text-align: left; background: var(--white); font-size: .85rem; }
+.scheduler-table caption { text-align: left; font-weight: 700; margin-bottom: .6rem; }
+.scheduler-table th, .scheduler-table td { padding: .8rem; border: 1px solid var(--line); }
+.scheduler-table thead { background: var(--paper-deep); }
+.scheduler-real { padding: 1.3rem; margin-top: 1.2rem; border: 1px solid var(--line); background: var(--white); }
+.scheduler-real summary { cursor: pointer; font-weight: 700; color: var(--blue); }
+.scheduler-real p { font-size: .85rem; color: #46505a; }
 
 .parallel-section { max-width: none; background: #f0ded7; }
 .parallel-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; max-width: 1200px; margin: auto; }

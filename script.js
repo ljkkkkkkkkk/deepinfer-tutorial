@@ -148,16 +148,36 @@ document.querySelectorAll("[data-cache]").forEach(button => {
   });
 });
 
-let scheduled = false;
-document.getElementById("scheduleButton").addEventListener("click", () => {
-  scheduled = !scheduled;
-  document.querySelectorAll(".mini-request").forEach((request, index) => request.classList.toggle("scheduled", scheduled && index === 0));
-  document.querySelectorAll(".gpu-slots div").forEach((slot, index) => slot.classList.toggle("active", scheduled && index < 8));
-  document.getElementById("schedulerMessage").textContent = scheduled
-    ? "本轮预算全部分给请求A；B和C继续等待。这样吞吐不一定差，但短请求B的体验可能不好。"
-    : "点击按钮，让调度器选择本轮任务。";
-  document.getElementById("scheduleButton").firstChild.textContent = scheduled ? "清空这一轮 " : "安排这一轮 ";
-});
+function renderPrefillDemo(run = false) {
+  const budget = Number(document.getElementById("prefillBudget").value);
+  const chunked = document.getElementById("chunkedPrefill").checked;
+  const result = calculatePrefillDemo(budget, chunked, run);
+  document.getElementById("prefillResults").innerHTML = result.requests.map(request =>
+    `<tr><th scope="row">${request.id}</th><td>${request.total}</td><td>${request.assigned}</td><td>${request.total - request.assigned}</td><td>${request.status}</td></tr>`
+  ).join("");
+  document.getElementById("budgetSummary").textContent = `本轮预算：${budget}；已安排：${result.used}；剩余预算：${result.remaining}。`;
+  const bar = document.getElementById("allocationBar");
+  const allocations = result.requests.filter(request => request.assigned > 0);
+  bar.innerHTML = allocations.map(request =>
+    `<span class="allocation-${request.id.toLowerCase()}" style="width:${request.assigned / budget * 100}%" title="${request.id}：${request.assigned} Token">${request.assigned / budget > 0.15 ? `${request.id} · ${request.assigned}` : request.id}</span>`
+  ).join("") + (result.remaining ? `<span class="allocation-empty" style="flex:1" title="剩余 ${result.remaining} Token">${result.remaining / budget > 0.15 ? (run ? `可用 ${result.remaining}` : "尚未安排") : ""}</span>` : "");
+  bar.setAttribute("aria-label", `Token预算${budget}，${allocations.map(request => `${request.id}分到${request.assigned}`).join("，") || "尚未安排"}，剩余${result.remaining}`);
+  const message = document.getElementById("schedulerMessage");
+  if (!run) {
+    message.textContent = "点击“安排这一轮”，查看实际分配。这里只统计读入的 Token，不代表已经输出答案。";
+  } else if (result.invalid) {
+    message.textContent = "这个演示配置不成立：关闭分块后，单轮预算必须覆盖最长输入A（780 Token）。请调到1024，或开启分块。实际DeepInfer还会进行配置和输入长度检查；不能假装A已处理，也不能无限等待下一轮。";
+  } else if (result.used === 1014) {
+    message.textContent = "A读入780个、B读入24个、C读入210个，共1014个Token，剩余10。三个请求的输入已读完，但回答尚未完成，之后还要Decode。";
+  } else {
+    message.textContent = `A本轮只读入${result.used} / 780个输入Token，还剩${780 - result.used}个。B、C本轮未处理。这是分块Prefill，不是A已经读完或回答完。`;
+  }
+}
+document.getElementById("scheduleButton").addEventListener("click", () => renderPrefillDemo(true));
+document.getElementById("resetSchedule").addEventListener("click", () => renderPrefillDemo(false));
+document.getElementById("prefillBudget").addEventListener("change", () => renderPrefillDemo(false));
+document.getElementById("chunkedPrefill").addEventListener("change", () => renderPrefillDemo(false));
+renderPrefillDemo(false);
 
 const pathData = {
   normal: {

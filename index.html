@@ -6,7 +6,7 @@
   <meta name="description" content="面向零基础学习者的 DeepInfer 中文互动教程：从 AI 推理、KV Cache 到源码阅读。" />
   <meta name="theme-color" content="#f6f2e8" />
   <title>DeepInfer 从零到一</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=2" />
 </head>
 <body>
   <a class="skip-link" href="#main">跳到正文</a>
@@ -242,12 +242,17 @@ output = llm.generate(
       <div class="lesson-meta"><span>LESSON 05</span><span>系统思维</span></div>
       <div class="section-heading left">
         <p class="kicker">THE SCHEDULER</p>
-        <h2>调度器，就是 GPU 的餐厅领位员</h2>
-        <p>它不负责“做菜”，但决定谁先入座、怎样拼桌，以及桌子不够时怎么办。</p>
+        <h2>调度器安排的是“本轮工作”，不是整份回答</h2>
+        <p>先用一个简化的 Prefill（读题）例子理解 Token 预算，再看 DeepInfer 怎样在读题与输出之间切换。</p>
+      </div>
+      <div class="warning-callout scheduler-assumptions"><strong>本例的前提：</strong>三个请求都还没读题，按 A → B → C 排队；假设 KV Cache 充足，只演示一轮输入处理。它不模拟 Decode、缓存分配或抢占，也不是 DeepInfer 的完整调度器。</div>
+      <div class="scheduler-controls">
+        <label>本轮 Token 预算 <select id="prefillBudget"><option value="256">256</option><option value="512">512</option><option value="1024">1024</option></select></label>
+        <label><input id="chunkedPrefill" type="checkbox" checked />允许分块读题（Chunked Prefill）</label>
       </div>
       <div class="scheduler-board">
         <div class="queue-zone">
-          <h3>等待队列 <small>waiting</small></h3>
+          <h3>初始等待队列 <small>A → B → C</small></h3>
           <div id="waitingQueue" class="request-queue">
             <div class="mini-request long"><b>A</b><span>长问题</span><small>780 tokens</small></div>
             <div class="mini-request short"><b>B</b><span>短问题</span><small>24 tokens</small></div>
@@ -256,19 +261,25 @@ output = llm.generate(
         </div>
         <div class="schedule-action">
           <button id="scheduleButton" type="button">安排这一轮 <span>→</span></button>
-          <small>Token预算：256</small>
+          <button id="resetSchedule" class="reset-schedule" type="button">重置演示</button>
+          <small>每次从相同的初始队列演示一轮</small>
         </div>
         <div class="gpu-zone">
-          <h3>GPU 执行批次 <small>running</small></h3>
-          <div class="gpu-slots" id="gpuSlots"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
-          <p id="schedulerMessage">点击按钮，让调度器选择本轮任务。</p>
+          <h3>本轮输入 Token 分配 <small>不是显存或 GPU 数量</small></h3>
+          <div class="allocation-bar" id="allocationBar" role="img" aria-label="尚未安排，本轮预算全部可用"><span class="allocation-empty">尚未安排</span></div>
+          <p id="budgetSummary">本轮预算：256；已安排：0；剩余预算：256。</p>
+          <p id="schedulerMessage" aria-live="polite">点击“安排这一轮”，查看实际分配。这里只统计读入的 Token，不代表已经输出答案。</p>
         </div>
       </div>
-      <div class="scheduler-lessons">
-        <div><b>连续批处理</b><span>不必等整批请求全部结束，有空位就加入新请求。</span></div>
-        <div><b>Token预算</b><span>每轮总工作量有限，调度器要在吞吐和延迟间取舍。</span></div>
-        <div><b>抢占与排队</b><span>资源不足时，暂停部分请求或让它继续等待。</span></div>
+      <div class="scheduler-table-wrap">
+        <table class="scheduler-table"><caption>每个请求处理了多少输入？</caption><thead><tr><th scope="col">请求</th><th scope="col">输入总长</th><th scope="col">本轮处理</th><th scope="col">尚未读完</th><th scope="col">结果</th></tr></thead><tbody id="prefillResults"><tr><th scope="row">A</th><td>780</td><td>0</td><td>780</td><td>等待安排</td></tr><tr><th scope="row">B</th><td>24</td><td>0</td><td>24</td><td>等待安排</td></tr><tr><th scope="row">C</th><td>210</td><td>0</td><td>210</td><td>等待安排</td></tr></tbody></table>
       </div>
+      <div class="scheduler-lessons">
+        <div><b>读完输入 ≠ 回答完成</b><span>A读入256个后，还有524个输入Token未读；读题完成后还要继续Decode生成回答。</span></div>
+        <div><b>预算重置，缓存不自动清空</b><span>下一轮重新计算Token预算，已有KV Cache通常继续保留。分块也不保证缓存空间一定够。</span></div>
+        <div><b>分块需要明确开启</b><span>关闭分块时不能只读A的一部分。若单轮上限小于最长输入，需要调整配置；不能靠反复等待解决。</span></div>
+      </div>
+      <details class="scheduler-real"><summary>那 DeepInfer 实际怎样调度？</summary><p>当前开源普通引擎（NORMAL）的一步选择 Prefill 或 Decode，多卡还需协调步骤类型。Prefill通常检查等待队列头部，在设定时机尝试接入新请求；重算请求可能插回队头。</p><p>Decode在资源充足时让多个请求同批推进；其选择代码按已输出Token数排序，从较少的一端考虑，缓存紧张时可从较多的一端抢占。它不知道谁马上能回答完。被抢占后，按配置与请求类型等待重算或结束，并非无代价恢复。</p><p>这是阶段切换与资源检查的组合，并非永远“短问题优先”。上述说明不等同于DeepSeek线上服务的全部策略。<a href="https://github.com/deepseek-ai/DeepInfer/blob/main/csrc/engine/scheduler.hpp" target="_blank" rel="noreferrer">查看公开调度源码 ↗</a></p></details>
       <button class="complete-button" data-lesson="lesson-5" type="button"><span>○</span> 我理解了调度器</button>
     </section>
 
@@ -450,6 +461,7 @@ print(running)
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./script.js"></script>
+  <script src="./scheduler-demo.js?v=2"></script>
+  <script src="./script.js?v=2"></script>
 </body>
 </html>
